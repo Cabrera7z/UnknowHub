@@ -1,4 +1,4 @@
--- [[ UNKNOW HUB - FULL AUTO FARM FUNCTIONAL ]]
+-- [[ UNKNOW HUB - V0.1 FULL & FUNCTIONAL ]]
 
 local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -52,15 +52,15 @@ function GetCurrentQuest()
 end
 
 -----------------------------------------------------------
--- 3. FUNÇÕES TÉCNICAS (AUTO EQUIP E VOO)
+-- 3. FUNÇÕES TÉCNICAS (ESTABILIZADOR E EQUIPAR)
 -----------------------------------------------------------
 _G.AutoFarm = false
 local TweenService = game:GetService("TweenService")
 
 function TweenTo(target)
     local dist = (rootPart.Position - target.Position).Magnitude
-    local speed = 250
-    local info = TweenInfo.new(dist/speed, Enum.EasingStyle.Linear)
+    if dist < 1 then return end
+    local info = TweenInfo.new(dist/250, Enum.EasingStyle.Linear)
     local tween = TweenService:Create(rootPart, info, {CFrame = target})
     tween:Play()
     return tween
@@ -74,7 +74,7 @@ function EquipMelee()
     end
 end
 
--- Estabilizador (Anti-Queda e Anti-Gravidade)
+-- Trava de Gravidade e Colisão (Resolve o "voar pro alto")
 spawn(function()
     while wait() do
         if _G.AutoFarm then
@@ -84,14 +84,11 @@ spawn(function()
                 bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
                 bv.Velocity = Vector3.new(0,0,0)
             end
-            for _, v in pairs(character:GetChildren()) do
+            for _, v in pairs(player.Character:GetChildren()) do
                 if v:IsA("BasePart") then v.CanCollide = false end
             end
         elseif rootPart:FindFirstChild("UnknowVel") then
             rootPart.UnknowVel:Destroy()
-            for _, v in pairs(character:GetChildren()) do
-                if v:IsA("BasePart") then v.CanCollide = true end
-            end
         end
     end
 end)
@@ -165,7 +162,7 @@ Btn.MouseButton1Click:Connect(function()
 end)
 
 -----------------------------------------------------------
--- 5. LOOP DE AUTO FARM FUNCIONAL
+-- 5. LOOP DE AUTO FARM (FIXED)
 -----------------------------------------------------------
 spawn(function()
     while wait() do
@@ -173,14 +170,12 @@ spawn(function()
             pcall(function()
                 local q = GetCurrentQuest()
                 
-                -- Se não tiver quest ativa, vai buscar
                 if player.PlayerGui.Main.Quest.Visible == false then
                     TweenTo(q[5])
                     if (rootPart.Position - q[5].Position).Magnitude < 20 then
                         game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", q[2], q[3])
                     end
                 else
-                    -- Procura o bicho da quest
                     local enemy = nil
                     for _, v in pairs(game.Workspace.Enemies:GetChildren()) do
                         if v.Name == q[4] and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
@@ -191,25 +186,27 @@ spawn(function()
                     
                     if enemy then
                         EquipMelee()
-                        -- Posiciona em cima do inimigo para evitar bugs de colisão
-                        rootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 12, 0)
+                        -- Posiciona em cima e olha para baixo (-90 graus)
+                        rootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 11, 0) * CFrame.Angles(math.rad(-90), 0, 0)
                         
-                        -- Bring Mobs
+                        -- Puxa os outros
                         for _, v in pairs(game.Workspace.Enemies:GetChildren()) do
                             if v.Name == q[4] and v:FindFirstChild("HumanoidRootPart") then
                                 if (v.HumanoidRootPart.Position - rootPart.Position).Magnitude < 150 then
-                                    v.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -10, 0)
+                                    v.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -11, 0)
                                     v.HumanoidRootPart.CanCollide = false
                                 end
                             end
                         end
                         
-                        -- Ataque
-                        local tool = character:FindFirstChildOfClass("Tool")
-                        if tool then tool:Activate() end
+                        -- Ataque Duplo
+                        local tool = player.Character:FindFirstChildOfClass("Tool")
+                        if tool then 
+                            tool:Activate() 
+                            game:GetService("VirtualUser"):Button1Down(Vector2.new(0,0))
+                        end
                     else
-                        -- Se os bichos sumirem, vai pro spawn deles
-                        TweenTo(q[5] * CFrame.new(0, 30, 0))
+                        TweenTo(q[5] * CFrame.new(0, 40, 0))
                     end
                 end
             end)
