@@ -1,9 +1,7 @@
--- AUTO FARM FINAL (CORRIGIDO + GUI)
+-- AUTO FARM FINAL (SEM SKILL / ATAQUE REAL / POSIÇÃO SEGURA)
 
 -- SERVICES
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- PLAYER
 local plr = Players.LocalPlayer
@@ -53,7 +51,7 @@ function GetWeapon()
     end
 end
 
--- ATAQUE REAL
+-- ATAQUE REAL CONTÍNUO
 function Attack()
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
@@ -61,18 +59,12 @@ function Attack()
     end
 end
 
--- SKILL
-function Skill(key)
-    VirtualInputManager:SendKeyEvent(true,key,false,game)
-    VirtualInputManager:SendKeyEvent(false,key,false,game)
-end
-
 -- CHECK
 function Alive(v)
     return v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0
 end
 
--- BRING
+-- BRING (TRAVA INIMIGO)
 function Bring(pos)
     for _,v in pairs(Enemies:GetChildren()) do
         if Alive(v) and v:FindFirstChild("HumanoidRootPart") then
@@ -89,11 +81,11 @@ end
 -- AUTO FARM LOOP
 --------------------------------------------------
 task.spawn(function()
-    while task.wait(0.1) do
+    while task.wait(0.05) do
         if _G.AutoFarm then
             pcall(function()
 
-                -- equip arma
+                -- equipa arma
                 local wep = GetWeapon()
                 if wep then
                     EquipWeapon(wep)
@@ -104,22 +96,17 @@ task.spawn(function()
                         
                         local hrp = enemy.HumanoidRootPart
 
-                        repeat task.wait(0.15)
+                        repeat task.wait(0.05)
                             if not _G.AutoFarm then break end
 
-                            -- posição fixa (IMPORTANTE)
-                            root.CFrame = hrp.CFrame * CFrame.new(0,0,3)
+                            -- POSIÇÃO SEGURA (FLUTUANDO)
+                            root.CFrame = hrp.CFrame * CFrame.new(0, 8, 6)
 
-                            -- bring mobs
+                            -- PUXA E TRAVA
                             Bring(hrp.Position)
 
-                            -- ataque real
+                            -- ATAQUE CONTÍNUO
                             Attack()
-
-                            -- skills com delay
-                            Skill("Z")
-                            task.wait(0.2)
-                            Skill("X")
 
                         until not Alive(enemy)
 
