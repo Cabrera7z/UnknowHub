@@ -1,9 +1,8 @@
--- AUTO FARM COMPLETO (FUNCIONAL)
+-- AUTO FARM FINAL (CORRIGIDO + GUI)
 
 -- SERVICES
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- PLAYER
@@ -11,12 +10,33 @@ local plr = Players.LocalPlayer
 local char = plr.Character or plr.CharacterAdded:Wait()
 local root = char:WaitForChild("HumanoidRootPart")
 
--- CONFIG
-_G.AutoFarm = true
+-- VAR
+local Enemies = workspace:WaitForChild("Enemies")
+_G.AutoFarm = false
 _G.SelectWeapon = "Melee"
 
--- REFERENCES
-local Enemies = workspace:WaitForChild("Enemies")
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+local gui = Instance.new("ScreenGui", plr.PlayerGui)
+gui.Name = "AutoFarmGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,200,0,100)
+frame.Position = UDim2.new(0.05,0,0.3,0)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Active = true
+frame.Draggable = true
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(1,0,1,0)
+button.Text = "AUTO FARM: OFF"
+button.TextColor3 = Color3.fromRGB(255,255,255)
+button.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+--------------------------------------------------
+-- FUNÇÕES
+--------------------------------------------------
 
 -- EQUIP
 function EquipWeapon(name)
@@ -33,18 +53,15 @@ function GetWeapon()
     end
 end
 
--- TELEPORT
-function TP(cf)
-    root.CFrame = cf
+-- ATAQUE REAL
+function Attack()
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
 end
 
--- ATTACK (ESSENCIAL PRA FUNCIONAR)
-function Click()
-    VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,1)
-    VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,1)
-end
-
--- SKILLS
+-- SKILL
 function Skill(key)
     VirtualInputManager:SendKeyEvent(true,key,false,game)
     VirtualInputManager:SendKeyEvent(false,key,false,game)
@@ -68,47 +85,63 @@ function Bring(pos)
     end
 end
 
--- QUEST (BÁSICO)
-function StartQuest()
-    pcall(function()
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest","BanditQuest1",1)
-    end)
-end
-
--- FARM
+--------------------------------------------------
+-- AUTO FARM LOOP
+--------------------------------------------------
 task.spawn(function()
-    while _G.AutoFarm do
-        pcall(function()
+    while task.wait(0.1) do
+        if _G.AutoFarm then
+            pcall(function()
 
-            -- garantir arma equipada
-            local wep = GetWeapon()
-            if wep then
-                EquipWeapon(wep)
-            end
-
-            -- iniciar quest (simples)
-            StartQuest()
-
-            -- loop inimigos
-            for _,enemy in pairs(Enemies:GetChildren()) do
-                if Alive(enemy) and enemy:FindFirstChild("HumanoidRootPart") then
-                    
-                    local hrp = enemy.HumanoidRootPart
-                    
-                    repeat task.wait()
-                        Bring(hrp.Position)
-                        TP(hrp.CFrame * CFrame.new(0,30,0))
-                        
-                        -- ataque real
-                        Click()
-                        Skill("Z")
-                        Skill("X")
-                        Skill("C")
-
-                    until not Alive(enemy) or not _G.AutoFarm
+                -- equip arma
+                local wep = GetWeapon()
+                if wep then
+                    EquipWeapon(wep)
                 end
-            end
 
-        end)
+                for _,enemy in pairs(Enemies:GetChildren()) do
+                    if Alive(enemy) and enemy:FindFirstChild("HumanoidRootPart") then
+                        
+                        local hrp = enemy.HumanoidRootPart
+
+                        repeat task.wait(0.15)
+                            if not _G.AutoFarm then break end
+
+                            -- posição fixa (IMPORTANTE)
+                            root.CFrame = hrp.CFrame * CFrame.new(0,0,3)
+
+                            -- bring mobs
+                            Bring(hrp.Position)
+
+                            -- ataque real
+                            Attack()
+
+                            -- skills com delay
+                            Skill("Z")
+                            task.wait(0.2)
+                            Skill("X")
+
+                        until not Alive(enemy)
+
+                    end
+                end
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- BOTÃO
+--------------------------------------------------
+button.MouseButton1Click:Connect(function()
+    _G.AutoFarm = not _G.AutoFarm
+    
+    if _G.AutoFarm then
+        button.Text = "AUTO FARM: ON"
+        button.BackgroundColor3 = Color3.fromRGB(0,170,0)
+    else
+        button.Text = "AUTO FARM: OFF"
+        button.BackgroundColor3 = Color3.fromRGB(40,40,40)
     end
 end)
