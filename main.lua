@@ -1,160 +1,466 @@
--- Unknown Hub - Blox Fruits | Auto Farm Completo
--- Com interface GUI, Auto Farm funcional e todos os mobs do Sea 1
+-- Unknown Hub - Blox Fruits | COMPLETO COM AUTO FARM FUNCIONAL
+-- Integrado com o AutoFarm do Cabrera Hub
+-- Todos os Mobs: Sea 1, Sea 2 e Sea 3 (Níveis 1-2650)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local screenGui
 
--- Configurações Globais
-local config = {
+-- Verificar qual Sea estamos
+local World1, World2, World3 = false, false, false
+if game.PlaceId == 2753915549 then
+    World1 = true
+elseif game.PlaceId == 4442272183 then
+    World2 = true
+elseif game.PlaceId == 7449423635 then
+    World3 = true
+end
+
+-- ============== CONFIGURAÇÕES GLOBAIS ==============
+local _G_Config = {
     autoFarmEnabled = false,
-    raidEnabled = false,
-    selectedMob = "Bandit",
+    autoQuestEnabled = false,
+    fastAttackEnabled = false,
+    bringMobEnabled = true,
     selectedWeapon = "Melee",
-    farmSpeed = 0.15,
-    currentSection = "Home"
+    farmSpeed = 100
 }
 
--- ============== DATABASE DE QUESTS - SEA 1 ==============
-local questDatabase = {
-    {Min = 1, Max = 9, Quest = "BanditQuest1", Mob = "Bandit", QuestLevel = 1, Area = "Starter Area"},
-    {Min = 10, Max = 14, Quest = "JungleQuest", Mob = "Monkey", QuestLevel = 1, Area = "Jungle"},
-    {Min = 15, Max = 29, Quest = "JungleQuest", Mob = "Gorilla", QuestLevel = 2, Area = "Jungle"},
-    {Min = 30, Max = 39, Quest = "BuggyQuest1", Mob = "Pirate", QuestLevel = 1, Area = "Buggy Village"},
-    {Min = 40, Max = 59, Quest = "BuggyQuest1", Mob = "Brute", QuestLevel = 2, Area = "Buggy Village"},
-    {Min = 60, Max = 74, Quest = "DesertQuest", Mob = "Desert Bandit", QuestLevel = 1, Area = "Desert"},
-    {Min = 75, Max = 89, Quest = "DesertQuest", Mob = "Desert Officer", QuestLevel = 2, Area = "Desert"},
-    {Min = 90, Max = 99, Quest = "SnowQuest", Mob = "Snow Bandit", QuestLevel = 1, Area = "Snow"},
-    {Min = 100, Max = 119, Quest = "SnowQuest", Mob = "Snowman", QuestLevel = 2, Area = "Snow"},
-    {Min = 120, Max = 149, Quest = "MarineQuest2", Mob = "Chief Petty Officer", QuestLevel = 1, Area = "Marine"},
-    {Min = 150, Max = 174, Quest = "SkyQuest", Mob = "Sky Bandit", QuestLevel = 1, Area = "Sky Island"},
-    {Min = 175, Max = 189, Quest = "SkyQuest", Mob = "Dark Master", QuestLevel = 2, Area = "Sky Island"},
-    {Min = 190, Max = 209, Quest = "PrisonerQuest", Mob = "Prisoner", QuestLevel = 1, Area = "Prison"},
-    {Min = 210, Max = 249, Quest = "PrisonerQuest", Mob = "Dangerous Prisoner", QuestLevel = 2, Area = "Prison"},
-    {Min = 250, Max = 274, Quest = "ColosseumQuest", Mob = "Toga Warrior", QuestLevel = 1, Area = "Colosseum"},
-    {Min = 275, Max = 299, Quest = "ColosseumQuest", Mob = "Gladiator", QuestLevel = 2, Area = "Colosseum"},
-    {Min = 300, Max = 324, Quest = "MagmaQuest", Mob = "Military Soldier", QuestLevel = 1, Area = "Magma"},
-    {Min = 325, Max = 374, Quest = "MagmaQuest", Mob = "Military Spy", QuestLevel = 2, Area = "Magma"},
-    {Min = 375, Max = 399, Quest = "FishmanQuest", Mob = "Fishman Warrior", QuestLevel = 1, Area = "Fishman"},
-    {Min = 400, Max = 449, Quest = "FishmanQuest", Mob = "Fishman Commando", QuestLevel = 2, Area = "Fishman"},
-    {Min = 450, Max = 474, Quest = "SkyExp1Quest", Mob = "God's Guard", QuestLevel = 1, Area = "Sky Exp Island"},
-    {Min = 475, Max = 524, Quest = "SkyExp1Quest", Mob = "Shanda", QuestLevel = 2, Area = "Sky Exp Island"},
-    {Min = 525, Max = 549, Quest = "SkyExp2Quest", Mob = "Royal Squad", QuestLevel = 1, Area = "Sky Island 2"},
-    {Min = 550, Max = 624, Quest = "SkyExp2Quest", Mob = "Royal Soldier", QuestLevel = 2, Area = "Sky Island 2"},
-    {Min = 625, Max = 649, Quest = "FountainQuest", Mob = "Galley Pirate", QuestLevel = 1, Area = "Fountain"},
-    {Min = 650, Max = 700, Quest = "FountainQuest", Mob = "Galley Captain", QuestLevel = 2, Area = "Fountain"},
-}
-
--- ============== FUNÇÕES PRINCIPAIS ==============
-
-local function getPlayerLevel()
-    local levelValue = player:FindFirstChild("Data")
-    if levelValue then
-        local level = levelValue:FindFirstChild("Level")
-        if level then return level.Value end
-    end
-    return 1
-end
-
-local function getQuestByLevel(level)
-    for _, data in pairs(questDatabase) do
-        if level >= data.Min and level <= data.Max then
-            return data
-        end
-    end
-    return questDatabase[#questDatabase]
-end
-
-local function teleportTo(cframe)
-    pcall(function()
-        local character = player.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            character.HumanoidRootPart.CFrame = cframe
-        end
-    end)
-end
-
-local function getClosestMob(mobName)
-    local closestMob = nil
-    local closestDistance = math.huge
+-- ============== FUNÇÃO DE DETECÇÃO DE LEVEL E QUEST ==============
+function CheckQuest() 
+    local MyLevel = game:GetService("Players").LocalPlayer.Data.Level.Value
     
-    for _, mob in pairs(workspace.Enemies:GetChildren()) do
-        if mob.Name == mobName and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
-            local distance = (mob.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-            if distance < closestDistance then
-                closestDistance = distance
-                closestMob = mob
+    if World1 then
+        if MyLevel == 1 or MyLevel <= 9 then
+            Mon = "Bandit"
+            LevelQuest = 1
+            NameQuest = "BanditQuest1"
+        elseif MyLevel == 10 or MyLevel <= 14 then
+            Mon = "Monkey"
+            LevelQuest = 1
+            NameQuest = "JungleQuest"
+        elseif MyLevel == 15 or MyLevel <= 29 then
+            Mon = "Gorilla"
+            LevelQuest = 2
+            NameQuest = "JungleQuest"
+        elseif MyLevel == 30 or MyLevel <= 39 then
+            Mon = "Pirate"
+            LevelQuest = 1
+            NameQuest = "BuggyQuest1"
+        elseif MyLevel == 40 or MyLevel <= 59 then
+            Mon = "Brute"
+            LevelQuest = 2
+            NameQuest = "BuggyQuest1"
+        elseif MyLevel == 60 or MyLevel <= 74 then
+            Mon = "Desert Bandit"
+            LevelQuest = 1
+            NameQuest = "DesertQuest"
+        elseif MyLevel == 75 or MyLevel <= 89 then
+            Mon = "Desert Officer"
+            LevelQuest = 2
+            NameQuest = "DesertQuest"
+        elseif MyLevel == 90 or MyLevel <= 99 then
+            Mon = "Snow Bandit"
+            LevelQuest = 1
+            NameQuest = "SnowQuest"
+        elseif MyLevel == 100 or MyLevel <= 119 then
+            Mon = "Snowman"
+            LevelQuest = 2
+            NameQuest = "SnowQuest"
+        elseif MyLevel == 120 or MyLevel <= 149 then
+            Mon = "Chief Petty Officer"
+            LevelQuest = 1
+            NameQuest = "MarineQuest2"
+        elseif MyLevel == 150 or MyLevel <= 174 then
+            Mon = "Sky Bandit"
+            LevelQuest = 1
+            NameQuest = "SkyQuest"
+        elseif MyLevel == 175 or MyLevel <= 189 then
+            Mon = "Dark Master"
+            LevelQuest = 2
+            NameQuest = "SkyQuest"
+        elseif MyLevel == 190 or MyLevel <= 209 then
+            Mon = "Prisoner"
+            LevelQuest = 1
+            NameQuest = "PrisonerQuest"
+        elseif MyLevel == 210 or MyLevel <= 249 then
+            Mon = "Dangerous Prisoner"
+            LevelQuest = 2
+            NameQuest = "PrisonerQuest"
+        elseif MyLevel == 250 or MyLevel <= 274 then
+            Mon = "Toga Warrior"
+            LevelQuest = 1
+            NameQuest = "ColosseumQuest"
+        elseif MyLevel == 275 or MyLevel <= 299 then
+            Mon = "Gladiator"
+            LevelQuest = 2
+            NameQuest = "ColosseumQuest"
+        elseif MyLevel == 300 or MyLevel <= 324 then
+            Mon = "Military Soldier"
+            LevelQuest = 1
+            NameQuest = "MagmaQuest"
+        elseif MyLevel == 325 or MyLevel <= 374 then
+            Mon = "Military Spy"
+            LevelQuest = 2
+            NameQuest = "MagmaQuest"
+        elseif MyLevel == 375 or MyLevel <= 399 then
+            Mon = "Fishman Warrior"
+            LevelQuest = 1
+            NameQuest = "FishmanQuest"
+        elseif MyLevel == 400 or MyLevel <= 449 then
+            Mon = "Fishman Commando"
+            LevelQuest = 2
+            NameQuest = "FishmanQuest"
+        elseif MyLevel == 450 or MyLevel <= 474 then
+            Mon = "God's Guard"
+            LevelQuest = 1
+            NameQuest = "SkyExp1Quest"
+        elseif MyLevel == 475 or MyLevel <= 524 then
+            Mon = "Shanda"
+            LevelQuest = 2
+            NameQuest = "SkyExp1Quest"
+        elseif MyLevel == 525 or MyLevel <= 549 then
+            Mon = "Royal Squad"
+            LevelQuest = 1
+            NameQuest = "SkyExp2Quest"
+        elseif MyLevel == 550 or MyLevel <= 624 then
+            Mon = "Royal Soldier"
+            LevelQuest = 2
+            NameQuest = "SkyExp2Quest"
+        elseif MyLevel == 625 or MyLevel <= 649 then
+            Mon = "Galley Pirate"
+            LevelQuest = 1
+            NameQuest = "FountainQuest"
+        elseif MyLevel >= 650 then
+            Mon = "Galley Captain"
+            LevelQuest = 2
+            NameQuest = "FountainQuest"
+        end
+    elseif World2 then
+        if MyLevel == 700 or MyLevel <= 724 then
+            Mon = "Raider"
+            LevelQuest = 1
+            NameQuest = "Area1Quest"
+        elseif MyLevel == 725 or MyLevel <= 774 then
+            Mon = "Mercenary"
+            LevelQuest = 2
+            NameQuest = "Area1Quest"
+        elseif MyLevel == 775 or MyLevel <= 799 then
+            Mon = "Swan Pirate"
+            LevelQuest = 1
+            NameQuest = "Area2Quest"
+        elseif MyLevel == 800 or MyLevel <= 874 then
+            Mon = "Factory Staff"
+            LevelQuest = 2
+            NameQuest = "Area2Quest"
+        elseif MyLevel == 875 or MyLevel <= 899 then
+            Mon = "Marine Lieutenant"
+            LevelQuest = 1
+            NameQuest = "MarineQuest3"
+        elseif MyLevel == 900 or MyLevel <= 949 then
+            Mon = "Marine Captain"
+            LevelQuest = 2
+            NameQuest = "MarineQuest3"
+        elseif MyLevel == 950 or MyLevel <= 974 then
+            Mon = "Zombie"
+            LevelQuest = 1
+            NameQuest = "ZombieQuest"
+        elseif MyLevel == 975 or MyLevel <= 999 then
+            Mon = "Vampire"
+            LevelQuest = 2
+            NameQuest = "ZombieQuest"
+        elseif MyLevel == 1000 or MyLevel <= 1049 then
+            Mon = "Snow Trooper"
+            LevelQuest = 1
+            NameQuest = "SnowMountainQuest"
+        elseif MyLevel == 1050 or MyLevel <= 1099 then
+            Mon = "Winter Warrior"
+            LevelQuest = 2
+            NameQuest = "SnowMountainQuest"
+        elseif MyLevel == 1100 or MyLevel <= 1124 then
+            Mon = "Lab Subordinate"
+            LevelQuest = 1
+            NameQuest = "IceSideQuest"
+        elseif MyLevel == 1125 or MyLevel <= 1174 then
+            Mon = "Horned Warrior"
+            LevelQuest = 2
+            NameQuest = "IceSideQuest"
+        elseif MyLevel == 1175 or MyLevel <= 1199 then
+            Mon = "Magma Ninja"
+            LevelQuest = 1
+            NameQuest = "FireSideQuest"
+        elseif MyLevel == 1200 or MyLevel <= 1249 then
+            Mon = "Lava Pirate"
+            LevelQuest = 2
+            NameQuest = "FireSideQuest"
+        elseif MyLevel == 1250 or MyLevel <= 1274 then
+            Mon = "Ship Deckhand"
+            LevelQuest = 1
+            NameQuest = "ShipQuest1"
+        elseif MyLevel == 1275 or MyLevel <= 1299 then
+            Mon = "Ship Engineer"
+            LevelQuest = 2
+            NameQuest = "ShipQuest1"
+        elseif MyLevel == 1300 or MyLevel <= 1324 then
+            Mon = "Ship Steward"
+            LevelQuest = 1
+            NameQuest = "ShipQuest2"
+        elseif MyLevel == 1325 or MyLevel <= 1349 then
+            Mon = "Ship Officer"
+            LevelQuest = 2
+            NameQuest = "ShipQuest2"
+        elseif MyLevel == 1350 or MyLevel <= 1374 then
+            Mon = "Arctic Warrior"
+            LevelQuest = 1
+            NameQuest = "FrostQuest"
+        elseif MyLevel == 1375 or MyLevel <= 1424 then
+            Mon = "Snow Lurker"
+            LevelQuest = 2
+            NameQuest = "FrostQuest"
+        elseif MyLevel == 1425 or MyLevel <= 1449 then
+            Mon = "Sea Soldier"
+            LevelQuest = 1
+            NameQuest = "ForgottenQuest"
+        elseif MyLevel >= 1450 then
+            Mon = "Water Fighter"
+            LevelQuest = 2
+            NameQuest = "ForgottenQuest"
+        end
+    elseif World3 then
+        if MyLevel == 1500 or MyLevel <= 1524 then
+            Mon = "Pirate Millionaire"
+            LevelQuest = 1
+            NameQuest = "PiratePortQuest"
+        elseif MyLevel == 1525 or MyLevel <= 1574 then
+            Mon = "Pistol Billionaire"
+            LevelQuest = 2
+            NameQuest = "PiratePortQuest"
+        elseif MyLevel == 1575 or MyLevel <= 1599 then
+            Mon = "Dragon Crew Warrior"
+            LevelQuest = 1
+            NameQuest = "AmazonQuest"
+        elseif MyLevel == 1600 or MyLevel <= 1624 then
+            Mon = "Dragon Crew Archer"
+            LevelQuest = 2
+            NameQuest = "AmazonQuest"
+        elseif MyLevel == 1625 or MyLevel <= 1649 then
+            Mon = "Female Islander"
+            LevelQuest = 1
+            NameQuest = "AmazonQuest2"
+        elseif MyLevel == 1650 or MyLevel <= 1699 then
+            Mon = "Giant Islander"
+            LevelQuest = 2
+            NameQuest = "AmazonQuest2"
+        elseif MyLevel == 1700 or MyLevel <= 1724 then
+            Mon = "Marine Commodore"
+            LevelQuest = 1
+            NameQuest = "MarineTreeIsland"
+        elseif MyLevel == 1725 or MyLevel <= 1774 then
+            Mon = "Marine Rear Admiral"
+            LevelQuest = 2
+            NameQuest = "MarineTreeIsland"
+        elseif MyLevel == 1775 or MyLevel <= 1799 then
+            Mon = "Fishman Raider"
+            LevelQuest = 1
+            NameQuest = "DeepForestIsland3"
+        elseif MyLevel == 1800 or MyLevel <= 1824 then
+            Mon = "Fishman Captain"
+            LevelQuest = 2
+            NameQuest = "DeepForestIsland3"
+        elseif MyLevel == 1825 or MyLevel <= 1849 then
+            Mon = "Forest Pirate"
+            LevelQuest = 1
+            NameQuest = "DeepForestIsland"
+        elseif MyLevel == 1850 or MyLevel <= 1899 then
+            Mon = "Mythological Pirate"
+            LevelQuest = 2
+            NameQuest = "DeepForestIsland"
+        elseif MyLevel == 1900 or MyLevel <= 1924 then
+            Mon = "Jungle Pirate"
+            LevelQuest = 1
+            NameQuest = "DeepForestIsland2"
+        elseif MyLevel == 1925 or MyLevel <= 1974 then
+            Mon = "Musketeer Pirate"
+            LevelQuest = 2
+            NameQuest = "DeepForestIsland2"
+        elseif MyLevel == 1975 or MyLevel <= 1999 then
+            Mon = "Reborn Skeleton"
+            LevelQuest = 1
+            NameQuest = "HauntedQuest1"
+        elseif MyLevel == 2000 or MyLevel <= 2024 then
+            Mon = "Living Zombie"
+            LevelQuest = 2
+            NameQuest = "HauntedQuest1"
+        elseif MyLevel == 2025 or MyLevel <= 2049 then
+            Mon = "Demonic Soul"
+            LevelQuest = 1
+            NameQuest = "HauntedQuest2"
+        elseif MyLevel == 2050 or MyLevel <= 2074 then
+            Mon = "Posessed Mummy"
+            LevelQuest = 2
+            NameQuest = "HauntedQuest2"
+        elseif MyLevel == 2075 or MyLevel <= 2099 then
+            Mon = "Peanut Scout"
+            LevelQuest = 1
+            NameQuest = "NutsIslandQuest"
+        elseif MyLevel == 2100 or MyLevel <= 2124 then
+            Mon = "Peanut President"
+            LevelQuest = 2
+            NameQuest = "NutsIslandQuest"
+        elseif MyLevel == 2125 or MyLevel <= 2149 then
+            Mon = "Ice Cream Chef"
+            LevelQuest = 1
+            NameQuest = "IceCreamIslandQuest"
+        elseif MyLevel == 2150 or MyLevel <= 2199 then
+            Mon = "Ice Cream Commander"
+            LevelQuest = 2
+            NameQuest = "IceCreamIslandQuest"
+        elseif MyLevel == 2200 or MyLevel <= 2224 then
+            Mon = "Cookie Crafter"
+            LevelQuest = 1
+            NameQuest = "CakeQuest1"
+        elseif MyLevel == 2225 or MyLevel <= 2249 then
+            Mon = "Cake Guard"
+            LevelQuest = 2
+            NameQuest = "CakeQuest1"
+        elseif MyLevel == 2250 or MyLevel <= 2274 then
+            Mon = "Baking Staff"
+            LevelQuest = 1
+            NameQuest = "CakeQuest2"
+        elseif MyLevel == 2275 or MyLevel <= 2299 then
+            Mon = "Head Baker"
+            LevelQuest = 2
+            NameQuest = "CakeQuest2"
+        elseif MyLevel == 2300 or MyLevel <= 2324 then
+            Mon = "Cocoa Warrior"
+            LevelQuest = 1
+            NameQuest = "ChocQuest1"
+        elseif MyLevel == 2325 or MyLevel <= 2349 then
+            Mon = "Chocolate Bar Battler"
+            LevelQuest = 2
+            NameQuest = "ChocQuest1"
+        elseif MyLevel == 2350 or MyLevel <= 2374 then
+            Mon = "Sweet Thief"
+            LevelQuest = 1
+            NameQuest = "ChocQuest2"
+        elseif MyLevel == 2375 or MyLevel <= 2399 then
+            Mon = "Candy Rebel"
+            LevelQuest = 2
+            NameQuest = "ChocQuest2"
+        elseif MyLevel == 2400 or MyLevel <= 2424 then
+            Mon = "Candy Pirate"
+            LevelQuest = 1
+            NameQuest = "CandyQuest1"
+        elseif MyLevel == 2425 or MyLevel <= 2449 then
+            Mon = "Snow Demon"
+            LevelQuest = 2
+            NameQuest = "CandyQuest1"
+        elseif MyLevel == 2450 or MyLevel <= 2474 then
+            Mon = "Isle Outlaw"
+            LevelQuest = 1
+            NameQuest = "TikiQuest1"
+        elseif MyLevel == 2475 or MyLevel <= 2499 then
+            Mon = "Island Boy"
+            LevelQuest = 2
+            NameQuest = "TikiQuest1"
+        elseif MyLevel == 2500 or MyLevel <= 2524 then
+            Mon = "Sun-kissed Warrio"
+            LevelQuest = 1
+            NameQuest = "TikiQuest2"
+        elseif MyLevel >= 2525 then
+            Mon = "Isle Champion"
+            LevelQuest = 2
+            NameQuest = "TikiQuest2"
+        end
+    end
+end
+
+-- ============== FUNÇÕES DE AUTO FARM ==============
+
+local function getClosestEnemy(name)
+    local enemies = workspace.Enemies:GetChildren()
+    local closest = nil
+    local closestDist = math.huge
+    for _, enemy in pairs(enemies) do
+        if enemy:FindFirstChild("HumanoidRootPart") and enemy.Name:find(name) and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+            local dist = (enemy.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closest = enemy
             end
         end
     end
-    
-    return closestMob
+    return closest
 end
 
-local function startQuest(questName, questLevel)
+local function bringMobAbove(enemy)
+    if not enemy or not enemy:FindFirstChild("HumanoidRootPart") then return end
+    
     pcall(function()
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
+        local targetPos = enemy.HumanoidRootPart.CFrame + Vector3.new(0, 30, 0)
+        enemy.HumanoidRootPart.CFrame = targetPos
     end)
-    wait(1)
 end
 
-local function attackMob(mob)
-    if not mob or not mob:FindFirstChild("Humanoid") or mob.Humanoid.Health <= 0 then
-        return false
-    end
-    
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
-    
-    -- Mover para perto do mob
-    local targetCFrame = mob.HumanoidRootPart.CFrame + Vector3.new(0, -5, 3)
-    local distance = (targetCFrame.Position - character.HumanoidRootPart.Position).Magnitude
-    local time = distance / 50
-    
-    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear)
-    local tween = game:GetService("TweenService"):Create(character.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
-    tween:Play()
-    
-    -- Atacar
-    game:GetService("VirtualUser"):ClickButton1(Vector2.new(9e9, 9e9))
-    
-    return true
+local function autoAttack()
+    pcall(function()
+        VirtualUser:ClickButton1(Vector2.new(9e9, 9e9))
+    end)
+end
+
+local function startQuest()
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", NameQuest, LevelQuest)
+    end)
 end
 
 -- ============== LOOP DE AUTO FARM ==============
 
-local function autoFarmLoop()
-    while config.autoFarmEnabled do
+local autoFarmConnection
+local function startAutoFarm()
+    autoFarmConnection = RunService.Stepped:Connect(function()
+        if not _G_Config.autoFarmEnabled then return end
+        
         pcall(function()
-            local level = getPlayerLevel()
-            local questData = getQuestByLevel(level)
+            CheckQuest()
             
-            if questData then
-                -- Iniciar quest
-                startQuest(questData.Quest, questData.QuestLevel)
-                wait(0.5)
-                
-                -- Loop de ataque
-                local farmTime = 0
-                while config.autoFarmEnabled and farmTime < 120 do
-                    local mob = getClosestMob(questData.Mob)
-                    
-                    if mob and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
-                        attackMob(mob)
-                    end
-                    
-                    wait(0.1)
-                    farmTime = farmTime + 0.1
+            local enemy = getClosestEnemy(Mon)
+            if enemy and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                if _G_Config.bringMobEnabled then
+                    bringMobAbove(enemy)
                 end
+                
+                -- Tween para perto do inimigo
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local targetCFrame = enemy.HumanoidRootPart.CFrame + Vector3.new(0, -5, 3)
+                    local dist = (targetCFrame.Position - char.HumanoidRootPart.Position).Magnitude
+                    local time = dist / _G_Config.farmSpeed
+                    
+                    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear)
+                    local tween = game:GetService("TweenService"):Create(char.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+                    tween:Play()
+                    
+                    -- Atacar
+                    autoAttack()
+                end
+            else
+                -- Iniciar quest novamente
+                startQuest()
             end
         end)
-        
-        wait(0.5)
+    end)
+end
+
+local function stopAutoFarm()
+    if autoFarmConnection then
+        autoFarmConnection:Disconnect()
     end
 end
 
@@ -206,7 +512,7 @@ local function createGUI()
     contentFrame.BorderSizePixel = 0
     contentFrame.Parent = mainFrame
 
-    -- ScrollingFrame para conteúdo
+    -- ScrollingFrame
     local contentScroll = Instance.new("ScrollingFrame")
     contentScroll.Name = "ContentScroll"
     contentScroll.Size = UDim2.new(1, -10, 1, -10)
@@ -216,54 +522,12 @@ local function createGUI()
     contentScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
     contentScroll.Parent = contentFrame
 
-    -- Layout para conteúdo
+    -- Layout
     local contentLayout = Instance.new("UIListLayout")
     contentLayout.Padding = UDim.new(0, 10)
     contentLayout.Parent = contentScroll
 
-    -- Criando botões de seções
-    local sections = {"Home", "Auto Farm", "Mobs", "Config"}
-    
-    for i, section in pairs(sections) do
-        local button = Instance.new("TextButton")
-        button.Name = section
-        button.Size = UDim2.new(1, -10, 0, 45)
-        button.Position = UDim2.new(0, 5, 0, 5 + (i - 1) * 55)
-        button.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        button.BorderSizePixel = 0
-        button.TextColor3 = Color3.fromRGB(200, 200, 200)
-        button.TextSize = 14
-        button.Font = Enum.Font.GothamSemibold
-        button.Text = section
-        button.Parent = sidePanel
-        
-        button.MouseButton1Click:Connect(function()
-            config.currentSection = section
-            updateContent(section, contentScroll)
-            
-            -- Highlight
-            for _, btn in pairs(sidePanel:GetChildren()) do
-                if btn:IsA("TextButton") then
-                    if btn == button then
-                        btn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-                        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    else
-                        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-                        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-                    end
-                end
-            end
-        end)
-    end
-
-    -- Highlight inicial
-    local firstButton = sidePanel:FindFirstChild("Home")
-    if firstButton then
-        firstButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-        firstButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    end
-
-    -- Função helper para criar botão toggle
+    -- Funções de componentes
     function createToggleButton(parent, text, callback)
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, 0, 0, 45)
@@ -279,177 +543,4 @@ local function createGUI()
         label.Font = Enum.Font.Gotham
         label.Text = text
         label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = container
-
-        local toggle = Instance.new("TextButton")
-        toggle.Size = UDim2.new(0, 50, 0, 25)
-        toggle.Position = UDim2.new(1, -55, 0.5, -12)
-        toggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        toggle.BorderSizePixel = 0
-        toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        toggle.TextSize = 12
-        toggle.Font = Enum.Font.GothamBold
-        toggle.Text = "OFF"
-        toggle.Parent = container
-
-        local toggleState = false
-        toggle.MouseButton1Click:Connect(function()
-            toggleState = not toggleState
-            toggle.BackgroundColor3 = toggleState and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(100, 100, 100)
-            toggle.Text = toggleState and "ON" or "OFF"
-            callback(toggleState)
-        end)
-    end
-
-    -- Função helper para criar botão de ação
-    function createActionButton(parent, text, callback)
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(1, 0, 0, 40)
-        button.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-        button.BorderSizePixel = 0
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.TextSize = 14
-        button.Font = Enum.Font.GothamSemibold
-        button.Text = text
-        button.Parent = parent
-
-        button.MouseButton1Click:Connect(callback)
-        
-        button.MouseEnter:Connect(function()
-            button.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
-        end)
-        
-        button.MouseLeave:Connect(function()
-            button.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-        end)
-    end
-
-    return {
-        mainFrame = mainFrame,
-        contentScroll = contentScroll,
-        contentFrame = contentFrame,
-        sidePanel = sidePanel
-    }
-end
-
--- Função para atualizar conteúdo das seções
-function updateContent(section, contentScroll)
-    -- Limpar conteúdo anterior
-    for _, child in pairs(contentScroll:GetChildren()) do
-        if child:IsA("GuiObject") and child.Name ~= "UIListLayout" then
-            child:Destroy()
-        end
-    end
-
-    if section == "Home" then
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, 0, 0, 50)
-        title.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        title.BorderSizePixel = 0
-        title.TextColor3 = Color3.fromRGB(0, 150, 255)
-        title.TextSize = 20
-        title.Font = Enum.Font.GothamBold
-        title.Text = "Bem-vindo ao Unknown Hub!"
-        title.Parent = contentScroll
-        
-        local info = Instance.new("TextLabel")
-        info.Size = UDim2.new(1, 0, 0, 100)
-        info.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        info.BorderSizePixel = 0
-        info.TextColor3 = Color3.fromRGB(150, 150, 150)
-        info.TextSize = 12
-        info.Font = Enum.Font.Gotham
-        info.TextWrapped = true
-        info.Text = "Seu hub completo para Blox Fruits!\n\nLevel Atual: " .. getPlayerLevel() .. "\n\nUse as abas ao lado para controlar o farming!"
-        info.Parent = contentScroll
-        
-    elseif section == "Auto Farm" then
-        createToggleButton(contentScroll, "🤖 Ativar Auto Farm", function(state)
-            config.autoFarmEnabled = state
-            if state then
-                spawn(autoFarmLoop)
-            end
-        end)
-        
-        local levelLabel = Instance.new("TextLabel")
-        levelLabel.Size = UDim2.new(1, 0, 0, 40)
-        levelLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        levelLabel.BorderSizePixel = 0
-        levelLabel.TextColor3 = Color3.fromRGB(0, 150, 255)
-        levelLabel.TextSize = 14
-        levelLabel.Font = Enum.Font.GothamSemibold
-        levelLabel.Text = "📊 Level: " .. getPlayerLevel()
-        levelLabel.Parent = contentScroll
-        
-        local questInfo = getQuestByLevel(getPlayerLevel())
-        local mobLabel = Instance.new("TextLabel")
-        mobLabel.Size = UDim2.new(1, 0, 0, 40)
-        mobLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        mobLabel.BorderSizePixel = 0
-        mobLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
-        mobLabel.TextSize = 12
-        mobLabel.Font = Enum.Font.Gotham
-        mobLabel.TextWrapped = true
-        mobLabel.Text = "⚡ Mob: " .. questInfo.Mob .. " | Área: " .. questInfo.Area
-        mobLabel.Parent = contentScroll
-        
-    elseif section == "Mobs" then
-        local mobList = {}
-        for _, quest in pairs(questDatabase) do
-            if not table.find(mobList, quest.Mob) then
-                table.insert(mobList, quest.Mob)
-            end
-        end
-        
-        for _, mob in pairs(mobList) do
-            createActionButton(contentScroll, "🎯 Farm: " .. mob, function()
-                config.selectedMob = mob
-                print("Selecionado: " .. mob)
-            end)
-        end
-        
-    elseif section == "Config" then
-        createActionButton(contentScroll, "🔄 Resetar GUI", function()
-            screenGui:Destroy()
-            createGUI()
-        end)
-        
-        createActionButton(contentScroll, "❌ Sair do Hub", function()
-            screenGui:Destroy()
-        end)
-    end
-end
-
--- Inicializar GUI
-local gui = createGUI()
-updateContent("Home", gui.contentScroll)
-
--- Tornar GUI arrastável
-local dragging = false
-local dragStart = Vector2.new(0, 0)
-
-gui.mainFrame.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = mouse.Position
-    end
-end)
-
-gui.mainFrame.InputEnded:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
-mouse.Move:Connect(function()
-    if dragging then
-        local delta = mouse.Position - dragStart
-        gui.mainFrame.Position = gui.mainFrame.Position + UDim2.new(0, delta.X, 0, delta.Y)
-        dragStart = mouse.Position
-    end
-end)
-
-print("✅ Unknown Hub Carregado com sucesso!")
-print("💡 Dica: Use a interface para controlar o Auto Farm")
-
-
+        label.Parent
